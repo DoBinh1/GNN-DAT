@@ -1,0 +1,19 @@
+# Claude Code workspace
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.venv/
+venv/
+
+# Training artifacts
+gnn_panels/outputs/
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
