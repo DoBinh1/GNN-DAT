@@ -123,7 +123,25 @@ với `W_1^{dec} ∈ ℝ^{d_h × d_h}` và `W_2^{dec} ∈ ℝ^{d_h × d_out}`. T
 θ = { W^{(1)}, b^{(1)}, W^{(2)}, b^{(2)}, ..., W^{(K)}, b^{(K)}, W_1^{dec}, b_1^{dec}, W_2^{dec}, b_2^{dec} }
 ```
 
-### 3.7 Bảng kích thước tensor tham khảo
+### 3.7 Cấu trúc tham số và nguyên lý chia sẻ trọng số
+
+Toàn bộ tham số học được của mô hình được tổ chức trong tập `θ`:
+
+```
+θ = { (W^{(1)}, b^{(1)}), (W^{(2)}, b^{(2)}), ..., (W^{(K)}, b^{(K)}),
+      (W_1^{dec}, b_1^{dec}), (W_2^{dec}, b_2^{dec}),
+      (γ^{(1)}, β^{(1)}), ..., (γ^{(K)}, β^{(K)}) }
+```
+
+Cấu trúc này có hai mức chia sẻ rất khác nhau, cần phân biệt rõ vì chúng là cơ chế hoạt động cốt lõi của mô hình.
+
+**Mức thứ nhất — chia sẻ giữa các đỉnh trong cùng một lớp.** Trong lớp `k`, ma trận `W^{(k)}` và bias `b^{(k)}` được dùng chung cho **mọi đỉnh** trong đồ thị. Khi tính `h_v^{(k)}` cho từng đỉnh `v`, công thức luôn dùng cùng một `W^{(k)}`. Đây là cơ chế đảm bảo mô hình áp dụng được cho đồ thị có kích thước thay đổi: dù `N` là 12 hay 19 hay 200, cùng một bộ tham số được áp lặp lại tại từng đỉnh. Nếu mỗi đỉnh có một `W` riêng, mô hình sẽ chỉ chạy được cho đồ thị có đúng số đỉnh đó, mất hoàn toàn khả năng tổng quát hóa.
+
+**Mức thứ hai — không chia sẻ giữa các lớp.** Mỗi lớp `k = 1, 2, ..., K` có một bộ `(W^{(k)}, b^{(k)})` **độc lập**, được học riêng. `W^{(1)}` và `W^{(2)}` là hai ma trận hoàn toàn khác nhau, không có ràng buộc nào buộc chúng phải giống nhau. Cấu trúc này cho phép các lớp chuyên môn hóa: lớp đầu mã hóa pattern cục bộ ở mức thô, lớp giữa kết hợp pattern trung gian, lớp sâu tích hợp pattern toàn cục — tương tự cách các lớp convolution trong CNN chuyên môn hóa từ phát hiện cạnh đến nhận dạng đối tượng.
+
+Tổ hợp hai mức này tạo ra một mô hình vừa **tổng quát hóa được qua các đồ thị khác nhau** (nhờ chia sẻ giữa các đỉnh), vừa **đủ biểu diễn để học các pattern phức tạp** (nhờ trọng số riêng cho từng lớp). Một biến thể đặc biệt gọi là **weight-tied GNN** dùng chung trọng số giữa các lớp, biến mô hình thành một dạng recurrent network trên đồ thị; biến thể này chỉ phù hợp với một số bài toán đặc biệt và không phải lựa chọn mặc định.
+
+### 3.8 Bảng kích thước tensor tham khảo
 
 Với cấu hình `K = 3, d_in = 7, d_h = 64, d_out = 200`, kích thước cụ thể của các tensor như sau:
 
@@ -230,6 +248,8 @@ Cấu trúc khối đường chéo đảm bảo message passing trong batch khô
 
 ### 5.5 Forward pass trong huấn luyện
 
+Một điểm quan trọng cần làm rõ trước khi đi vào chi tiết: forward pass trong huấn luyện **giống hệt** forward pass trong suy luận về mặt phép toán. Cùng một mô hình với cùng một bộ tham số `θ` được chạy qua cùng một chuỗi `K` lớp GNN và decoder, cho ra cùng một dạng đầu ra `Ŷ`. Khác biệt giữa hai giai đoạn không nằm ở forward pass, mà ở việc huấn luyện thực hiện thêm hai bước sau khi forward kết thúc: tính loss và lan truyền ngược (backpropagation) để cập nhật `θ`. Mọi thứ xảy ra "trong" mô hình ở cả hai giai đoạn là một và như nhau.
+
 Với một batch, forward pass thực hiện lần lượt:
 
 ```
@@ -262,7 +282,27 @@ weight_decay     = 1e-4    (regularization L2)
 
 Adam thích nghi learning rate cho từng tham số dựa trên momentum bậc nhất và bậc hai của gradient, phù hợp với các bài toán có gradient không đồng đều giữa các thành phần tham số.
 
-### 5.7 Quy trình huấn luyện một epoch
+### 5.7 Độ sâu kiến trúc, độ sâu lan truyền gradient, và tính chất end-to-end
+
+Số lớp `K` của mô hình kéo theo một hệ quả trực tiếp lên quá trình huấn luyện: trong mỗi bước huấn luyện, gradient của loss phải lan truyền ngược qua **đủ K lớp** để cập nhật tất cả các ma trận trọng số. Cụ thể, theo chain rule:
+
+```
+∂L / ∂W_dec        : tính trực tiếp từ ∂L / ∂Ŷ
+∂L / ∂W^{(K)}      : qua chain rule từ ∂L / ∂H^{(K)}
+∂L / ∂W^{(K-1)}    : qua chain rule từ ∂L / ∂H^{(K-1)}
+...
+∂L / ∂W^{(1)}      : qua chain rule từ ∂L / ∂H^{(1)}
+```
+
+Tất cả các gradient này được tính trong **một** lần gọi `loss.backward()`, nhờ cơ chế autograd của framework. Đây là tính chất **end-to-end training** của deep learning hiện đại: toàn bộ `K + 1` ma trận trọng số (cộng các tham số LayerNorm) được tối ưu **đồng thời** trong cùng một bước, không có giai đoạn riêng để train từng lớp.
+
+Cần phân biệt rõ ba khái niệm độ sâu thường dễ bị lẫn lộn. **Độ sâu kiến trúc** là `K`, số lớp GNN trong mô hình, được cố định khi thiết kế. **Độ sâu lan truyền gradient** trong một bước huấn luyện cũng bằng `K`, vì gradient phải đi ngược qua đủ các lớp này. **Số bước huấn luyện** là số lần lặp của vòng (forward + backward + update), thường là hàng vạn đến hàng trăm nghìn, hoàn toàn không phụ thuộc `K`.
+
+Khi `K` lớn, độ sâu lan truyền gradient lớn theo, dẫn đến hai bệnh kinh điển của deep learning. **Vanishing gradient** xảy ra khi các đạo hàm tích lũy có giá trị nhỏ hơn 1; sau nhiều phép nhân liên tiếp, gradient ở các lớp đầu tiến về 0, làm các lớp này gần như không học được. **Exploding gradient** xảy ra khi các đạo hàm có giá trị lớn hơn 1; sau nhiều phép nhân, gradient ở các lớp đầu tiến về vô cực, gây ra loss `NaN` và phá hỏng huấn luyện. Cả hai không phải đặc thù của GNN, mà là vấn đề chung của bất kỳ mô hình deep nào với nhiều lớp.
+
+Các kỹ thuật chống vanishing/exploding gradient gồm: residual connection cộng `H^{(k-1)}` vào `H^{(k)}` để tạo "đường tắt" cho gradient bỏ qua nhiều lớp; LayerNorm sau mỗi lớp giúp duy trì activation và gradient trong dải hợp lý; gradient clipping (đã đề cập ở Mục 5.7) chặn norm gradient ở ngưỡng cố định; và khởi tạo trọng số đúng cách (Xavier hoặc He init) cho phép gradient lan truyền qua nhiều lớp mà không thay đổi đột ngột về magnitude. Trong bài toán panel với `K = 2-4`, các vấn đề này hiếm khi nghiêm trọng và LayerNorm cùng gradient clipping thường là đủ.
+
+### 5.8 Quy trình huấn luyện một epoch
 
 Một epoch là một lượt duyệt toàn bộ tập train. Pseudocode đầy đủ:
 
@@ -298,13 +338,13 @@ Các thực hành bổ sung:
 
 `clip_grad_norm_` giới hạn L2-norm của gradient ở ngưỡng cố định (thường 1.0) để tránh hiện tượng gradient nổ, đặc biệt khi đồ thị có đỉnh bậc cao. Scheduler giảm learning rate khi validation loss không cải thiện (chẳng hạn `ReduceLROnPlateau`), giúp hội tụ ổn định ở giai đoạn cuối. Early stopping dừng training khi validation loss không cải thiện trong một số epoch liên tiếp (thường 20-30), tránh overfitting.
 
-### 5.8 Tinh chỉnh hyperparameter
+### 5.9 Tinh chỉnh hyperparameter
 
 Các hyperparameter chính cần tinh chỉnh trên tập validation gồm số lớp `K ∈ {2, 3, 4}`, kích thước không gian ẩn `d_h ∈ {32, 64, 128, 256}`, lựa chọn AGG `∈ {mean, sum, max}`, learning rate `∈ [10⁻⁴, 10⁻²]`, kích thước batch `∈ {16, 32, 64, 128}`. Việc tinh chỉnh thường dùng grid search nếu không gian nhỏ, hoặc Bayesian optimization (vd: thư viện Optuna) khi không gian rộng.
 
 Tiêu chí lựa chọn cấu hình tốt nhất là validation loss thấp nhất sau early stopping. Cần chú ý cấu hình tốt trên validation chưa chắc tốt trên test — đây là lý do giữ tập test riêng và chỉ đánh giá một lần ở cuối.
 
-### 5.9 Lưu mô hình
+### 5.10 Lưu mô hình
 
 Sau khi training kết thúc, các artifact sau được lưu:
 
@@ -383,6 +423,8 @@ X_norm[v, j] = (X[v, j] - μ_x[j]) / σ_x[j]    với mọi v, j
 
 ### 6.4 Forward pass không gradient
 
+Forward pass trong giai đoạn suy luận thực hiện **chính xác cùng chuỗi phép toán** đã trình bày ở Mục 5.5 cho giai đoạn huấn luyện. Cùng `K` lớp GNN với cùng các ma trận `W^{(k)}`, cùng decoder, cùng phi tuyến và LayerNorm — không có bất kỳ điều chỉnh nào trong cấu trúc tính toán. Khác biệt duy nhất nằm ở hai chi tiết kỹ thuật: phép tính được bao trong `torch.no_grad()` để bỏ tính gradient, và mô hình được đặt ở chế độ `model.eval()` để các layer có hành vi khác giữa train/eval (như Dropout, BatchNorm) chuyển sang chế độ suy luận. Việc các tensor trung gian không cần lưu lại cho backprop là lý do chính khiến suy luận tốn bộ nhớ ít hơn nhiều so với huấn luyện.
+
 Mô hình thực hiện một forward pass duy nhất:
 
 ```python
@@ -398,7 +440,7 @@ with torch.no_grad():
     Y_pred_norm = Z @ W2_dec.T + b2_dec                 # [N, d_out]
 ```
 
-Việc bao toàn bộ phép toán trong `torch.no_grad()` có hai lợi ích. Thứ nhất, không lưu lại các tensor trung gian cho backprop, tiết kiệm bộ nhớ đáng kể. Thứ hai, các phép kiểm tra liên quan đến gradient được bỏ qua, tăng tốc execution. Đặt `model.eval()` thêm một bước nữa: một số layer như Dropout và BatchNorm có hành vi khác trong eval mode (Dropout không drop, BatchNorm dùng thống kê running thay vì batch).
+Lý do `torch.no_grad()` cần thiết là để framework không xây dựng đồ thị tính toán cho autograd, nhờ đó các tensor trung gian không bị giữ lại trong bộ nhớ và các phép kiểm tra liên quan đến gradient được bỏ qua hoàn toàn. Trên đồ thị có vài chục đến vài trăm đỉnh, lợi ích này tương đương giảm bộ nhớ vài lần và tăng tốc tính toán đáng kể so với chạy mô hình trong chế độ huấn luyện.
 
 ### 6.5 Khử chuẩn hóa đầu ra
 
