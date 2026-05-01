@@ -1,0 +1,152 @@
+Tôi đang nghiên cứu một bài báo khoa học về Graph Neural Networks cho dự đoán ứng suất trong stiffened panels.
+
+Hãy viết lại nội dung của bài báo này thành một **báo cáo học thuật hoàn chỉnh bằng tiếng Việt**, với mục tiêu:
+
+* giúp tôi hiểu bản chất một cách tự nhiên nhưng sâu sắc
+* cung cấp đầy đủ chi tiết kỹ thuật để tôi có thể tái hiện (reproduce) nghiên cứu
+* trình bày như một báo cáo liền mạch, KHÔNG viết dạng bullet rời rạc
+
+---
+
+## YÊU CẦU VỀ CÁCH VIẾT
+
+* Viết theo văn phong báo cáo khoa học (giống paper hoặc thesis)
+* Các đoạn văn phải liên kết chặt chẽ, diễn giải đầy đủ, không viết kiểu liệt kê ngắn gọn
+* Mỗi khái niệm phải được giải thích rõ:
+
+  * trực giác (intuition)
+  * sau đó mới đến kỹ thuật (technical)
+* Không copy lại abstract hay paraphrase sơ sài
+* Ưu tiên giúp người đọc “hiểu và làm lại được”
+
+---
+
+## CẤU TRÚC BẮT BUỘC
+
+### 1. Giới thiệu bài toán
+
+Trình bày:
+
+* bài toán dự đoán ứng suất trong kết cấu stiffened panel
+* vai trò của FEM và hạn chế của nó trong tối ưu thiết kế
+* lý do cần Reduced Order Model
+* động lực sử dụng Machine Learning và GNN
+
+---
+
+### 2. Cơ sở lý thuyết
+
+Trình bày có diễn giải:
+
+* khái niệm Graph và cách biểu diễn dữ liệu dạng graph
+* bản chất của Graph Neural Network
+* cơ chế message passing
+* giải thích GraphSAGE trong ngữ cảnh bài toán
+
+---
+
+### 3. Phương pháp đề xuất (trọng tâm)
+
+Viết chi tiết và mạch lạc:
+
+* cách chuyển kết cấu cơ học → graph
+* ý nghĩa vật lý của node, edge, feature
+* so sánh:
+
+  * finite element-based graph
+  * structural unit-based graph
+
+Giải thích rõ:
+
+* vì sao phương pháp mới giảm số node
+* vì sao vẫn giữ được độ chính xác
+
+---
+
+### 4. Kiến trúc mô hình và thuật toán
+
+Trình bày đầy đủ:
+
+* công thức GraphSAGE (giải thích từng thành phần)
+* cơ chế aggregation, propagation, update
+* hàm loss (MSE) và ý nghĩa của nó
+* hyperparameters và vai trò
+
+---
+
+### 5. Chuẩn bị dữ liệu
+
+Mô tả chi tiết:
+
+* cách sinh dữ liệu bằng FEM (ABAQUS)
+* các biến đầu vào:
+
+  * hình học
+  * điều kiện biên
+  * vật liệu
+  * tải trọng
+* cách biểu diễn output (stress field → vector)
+
+Giải thích:
+
+* tại sao phải reshape
+* ảnh hưởng của sampling (10×20)
+
+---
+
+### 6. Quy trình huấn luyện và pipeline tổng thể
+
+Trình bày toàn bộ pipeline từ đầu đến cuối:
+
+* sinh dữ liệu
+* chuyển thành graph
+* huấn luyện GNN
+* dự đoán
+
+Phải giải thích vai trò của từng bước, không chỉ liệt kê
+
+---
+
+### 7. Kết quả và phân tích
+
+Trình bày:
+
+* độ chính xác của mô hình
+* so sánh với FEM
+* phân tích:
+
+  * khi mô hình hoạt động tốt
+  * khi có sai số
+
+---
+
+### 8. Phân tích hiệu quả tính toán
+
+Giải thích rõ:
+
+* vì sao giảm GPU memory
+* vì sao giảm training time
+* liên hệ với số node trong graph
+
+---
+
+### 9. Kết luận
+
+Tóm lược:
+
+* đóng góp chính của phương pháp
+* ý nghĩa trong bài toán cơ học
+
+---
+
+## YÊU CẦU QUAN TRỌNG NHẤT
+
+Báo cáo phải giúp tôi:
+
+👉 có thể tự:
+
+* mô tả lại phương pháp
+* thiết kế lại pipeline
+* và triển khai lại bằng code
+
+Nếu cần, hãy giải thích kỹ hơn thay vì viết ngắn lại.
